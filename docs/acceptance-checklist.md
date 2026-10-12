@@ -113,8 +113,8 @@
 | --- | --- | --- |
 | 1 | 完整 package.json | ✅ |
 | 2 | 生产构建脚本 | ✅ `npm run build` |
-| 3 | SPA 路由回退 | ✅ `public/_redirects` |
-| 4 | 刷新详情页不 404 | ✅ 浏览器实测 + 本地静态服务器实测 |
+| 3 | SPA 路由回退 | ✅ `wrangler.jsonc` 的 `assets.not_found_handling: "single-page-application"`（Workers 静态资源不支持 `_redirects` 里的 `/* /index.html 200`，会被判定为无限循环） |
+| 4 | 刷新详情页不 404 | ✅ 用 `wrangler dev`（真实 workerd 运行时）实测 `/certificates/<id>`、`/settings` 等深链均返回 200 + index.html；另有本地静态服务器与浏览器实测 |
 | 5 | 依赖支持浏览器环境 | ✅ 真实浏览器运行验证 |
 | 6 | 不依赖本地文件系统执行 OpenSSL | ✅ 运行时不调用任何外部进程 |
 | 7 | 不依赖服务器进程 | ✅ |

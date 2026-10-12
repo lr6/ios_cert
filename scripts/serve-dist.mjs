@@ -2,7 +2,8 @@
 /**
  * 本地静态服务器：用于在“接近 Cloudflare Pages 的环境”下验证构建产物。
  * - 读取 public/_headers 中的 CSP 等安全响应头并实际下发；
- * - 实现 SPA 回退（未命中的路径返回 index.html），等价于 _redirects 的效果。
+ * - 实现 SPA 回退（未命中的路径返回 index.html），
+ *   等价于 Workers 静态资源的 not_found_handling = "single-page-application"。
  *
  * 用法：npm run build && node scripts/serve-dist.mjs [port]
  */
@@ -36,7 +37,7 @@ createServer((req, res) => {
   let filePath = join(DIST, safePath)
 
   if (!safePath || !existsSync(filePath) || statSync(filePath).isDirectory()) {
-    // SPA 回退：交给前端路由处理（等价于 Cloudflare Pages 的 _redirects）
+    // SPA 回退：交给前端路由处理（等价于 Workers 静态资源的 not_found_handling）
     filePath = join(DIST, 'index.html')
   }
 

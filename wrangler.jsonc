@@ -1,0 +1,15 @@
+{
+  // Cloudflare Workers（静态资源）部署配置。
+  // 说明 1：Workers 静态资源不支持 `_redirects` 里的 `/* /index.html 200` 规则
+  //         （服务端校验会判定为无限循环，报 code 100324），SPA 回退必须用
+  //         not_found_handling = "single-page-application"。
+  // 说明 2：compatibility_date 不要用“今天”，否则本地 wrangler dev 的 workerd
+  //         可能还不支持该日期（会报 "newest date supported by this server binary"）。
+  //         选择一个已发布且稳定的日期即可；纯静态资源 Worker 不受其影响。
+  "name": "ios-cert",
+  "compatibility_date": "2026-05-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

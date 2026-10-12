@@ -32,7 +32,8 @@ npm run preview      # 预览构建产物
 | `npm run lint` | ESLint 检查 |
 | `npm run check:dist` | 检查构建产物中是否混入私钥/证书/测试密码 |
 | `npm run verify:all` | 类型检查 + Lint + 测试 + 构建 + 产物检查（发布前一键） |
-| `node scripts/serve-dist.mjs 4174` | 用「贴近 Cloudflare Pages」的方式本地跑构建产物（含 CSP 与 SPA 回退） |
+| `node scripts/serve-dist.mjs 4174` | 本地静态服务器跑构建产物（含 CSP 与 SPA 回退，等价于线上行为） |
+| `npx wrangler dev` | 用**真实 Workers 运行时（workerd）**本地验证部署配置、深链回退与响应头 |
 
 ---
 

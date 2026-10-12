@@ -53,6 +53,19 @@ OpenSSL 二进制会被自动探测，顺序为：环境变量 `OPENSSL_BIN` →
 6. 用 Node 生成的加密备份文件在**全新浏览器配置**中恢复 → 记录与私钥恢复成功，「本地主密钥」自动重建；
 7. 恢复后在浏览器中导出 P12 → 下载文件交给 OpenSSL：正确密码可打开、提取的证书与私钥公钥一致、指纹匹配、错误密码失败。
 
+## 5. 部署形态验证（Cloudflare Workers 静态资源）
+
+线上用的是 **Workers + 静态资源**（不是 Pages），因此额外做了运行时级别的验证：
+
+1. `npx wrangler deploy --dry-run` → 配置解析正常、读到 `dist` 下全部资源；
+2. `npx wrangler dev`（真实 workerd 运行时）：
+   - `/`、`/certificates`、`/certificates/<id>`、`/settings`、`/not-exist-page` 全部返回 **200 + index.html**（SPA 回退生效，日志显示 `using not_found_handling behavior`）；
+   - `Parsed 2 valid header rules`（`_headers` 里的 CSP 等响应头已应用）；
+   - 静态资源（`/assets/*.js`、`/favicon.svg`）均 200。
+3. 用浏览器打开 `http://127.0.0.1:8788/certificates/<id>`：应用正常启动，**控制台 0 错误 0 警告**（说明严格 CSP 与应用的实现兼容）。
+
+> 历史故障：最初在 `public/_redirects` 里写了 Pages 风格的 `/*  /index.html  200`，Workers 服务端校验判定为无限循环（`code 100324`）导致部署失败。已改为 `wrangler.jsonc` 的 `assets.not_found_handling = "single-page-application"`，并在上面用真实运行时验证通过。
+
 ## 5. 尚未完成的验证
 
 Apple 侧的三项（后台接受 CSR、macOS 钥匙串导入 P12、真机签名）需要真实账号与 macOS 环境，

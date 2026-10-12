@@ -102,7 +102,8 @@ draft ──▶ csr-created ──▶ cer-imported ──▶ ready
 ## 4. 构建与部署
 
 - 构建命令 `npm run build`，输出 `dist/`；
-- SPA 回退由 `public/_redirects`（`/* /index.html 200`）处理，刷新详情页不会 404；
+- SPA 回退由 `wrangler.jsonc` 的 `assets.not_found_handling = "single-page-application"` 处理，刷新详情页不会 404；
+  （**不要**在 Workers 静态资源里用 `_redirects` 写 `/* /index.html 200`：服务端会判定为无限循环并导致部署失败，错误码 100324）
 - 安全响应头位于 `public/_headers`（严格 CSP、nosniff、DENY frame 等）；
 - `scripts/serve-dist.mjs` 在本地复现相同的响应头与回退行为，便于验证；
 - 详细部署步骤见 [deployment-cloudflare.md](deployment-cloudflare.md)。
