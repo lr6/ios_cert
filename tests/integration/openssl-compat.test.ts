@@ -157,9 +157,13 @@ describe.skipIf(!openssl)('OpenSSL 独立兼容性验证（集成）', () => {
     expect(info.ok, `OpenSSL 无法解析本项目生成的 P12: ${infoOutput}`).toBe(true)
     expect(infoOutput).toContain('friendlyName: iOS Cert Manager Verification')
 
-    // 结构断言（完全不经过 node-forge）：私钥使用 PBES2 + AES-256-CBC，MAC 摘要为 SHA-1
+    // 结构断言（完全不经过 node-forge）：私钥**与证书袋**都使用 PBES2 + AES-256-CBC，
+    // MAC 摘要为 SHA-1。PBES2 OID 出现两次 = 私钥袋与证书袋都被加密
+    // （未加密的证书袋是 node-forge 的默认行为，部分 Java 系工具链会因此导入失败）。
     expect(derContainsOid(der, OID_PBES2), '未找到 PBES2 OID').toBe(true)
     expect(derContainsOid(der, OID_AES256_CBC), '未找到 AES-256-CBC OID').toBe(true)
+    expect(countOidOccurrences(der, OID_PBES2), '证书袋没有被加密（PBES2 只出现一次）').toBeGreaterThanOrEqual(2)
+    expect(countOidOccurrences(der, OID_ENCRYPTED_DATA), '未找到 PKCS#7 EncryptedData 结构').toBeGreaterThanOrEqual(1)
     const asn1Dump = runOpenSsl(openssl!, ['asn1parse', '-inform', 'DER', '-in', p12Path])
     expect(asn1Dump.stdout).toContain(':sha1')
 
@@ -232,6 +236,8 @@ describe.skipIf(!openssl)('OpenSSL 独立兼容性验证（集成）', () => {
     ])
     expect(result.ok, `OpenSSL 无法读取 3DES 变体: ${result.stderr}`).toBe(true)
     expect(derContainsOid(der, OID_PBE_SHA1_3DES), '未找到 3DES PBE OID').toBe(true)
+    // 私钥袋 + 证书袋都用 pbeWithSHAAnd3-KeyTripleDES-CBC（与 OpenSSL 传统产物一致）
+    expect(countOidOccurrences(der, OID_PBE_SHA1_3DES), '证书袋没有用 3DES 加密').toBeGreaterThanOrEqual(2)
   })
 
   it('friendlyName 使用标准 BMPString 编码（中文名以 UCS-2 存放）', () => {
@@ -309,6 +315,7 @@ describe.skipIf(!openssl)('OpenSSL 独立兼容性验证（集成）', () => {
 const OID_PBES2 = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x0d] // 1.2.840.113549.1.5.13
 const OID_AES256_CBC = [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x2a] // 2.16.840.1.101.3.4.1.42
 const OID_PBE_SHA1_3DES = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01, 0x03] // 1.2.840.113549.1.12.1.3
+const OID_ENCRYPTED_DATA = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x06] // 1.2.840.113549.1.7.6
 
 function derContainsOid(der: Uint8Array, oid: number[]): boolean {
   outer: for (let i = 0; i + oid.length <= der.length; i++) {
@@ -336,6 +343,18 @@ function readFriendlyNameFromDer(der: Uint8Array): { tag: number; value: string 
     value += String.fromCharCode((bytes[i] << 8) | bytes[i + 1])
   }
   return { tag, value }
+}
+
+function countOidOccurrences(der: Uint8Array, oid: number[]): number {
+  let count = 0
+  outer: for (let i = 0; i + oid.length <= der.length; i++) {
+    for (let j = 0; j < oid.length; j++) {
+      if (der[i + j] !== oid[j]) continue outer
+    }
+    count += 1
+    i += oid.length - 1
+  }
+  return count
 }
 
 function indexOfBytes(haystack: Uint8Array, needle: number[]): number {

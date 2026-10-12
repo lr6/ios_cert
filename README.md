@@ -22,18 +22,19 @@ npm run preview      # 预览构建产物
 
 ### 常用命令
 
-| 命令 | 作用 |
-| --- | --- |
-| `npm run dev` | 本地开发（默认 http://localhost:5173） |
-| `npm run build` | 类型检查 + 生产构建到 `dist/` |
-| `npm test` | 运行全部自动化测试（单元 + 集成） |
-| `npm run verify:crypto` | **只跑 OpenSSL 独立兼容性验证**（推荐每次改密码学代码后运行） |
-| `npm run typecheck` | TypeScript / Vue 类型检查 |
-| `npm run lint` | ESLint 检查 |
-| `npm run check:dist` | 检查构建产物中是否混入私钥/证书/测试密码 |
-| `npm run verify:all` | 类型检查 + Lint + 测试 + 构建 + 产物检查（发布前一键） |
-| `node scripts/serve-dist.mjs 4174` | 本地静态服务器跑构建产物（含 CSP 与 SPA 回退，等价于线上行为） |
-| `npx wrangler dev` | 用**真实 Workers 运行时（workerd）**本地验证部署配置、深链回退与响应头 |
+| 命令                                                                  | 作用                                                                   |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `npm run dev`                                                         | 本地开发（默认 http://localhost:5173）                                 |
+| `npm run build`                                                       | 类型检查 + 生产构建到 `dist/`                                          |
+| `npm test`                                                            | 运行全部自动化测试（单元 + 集成）                                      |
+| `npm run verify:crypto`                                               | **只跑 OpenSSL 独立兼容性验证**（推荐每次改密码学代码后运行）          |
+| `npm run typecheck`                                                   | TypeScript / Vue 类型检查                                              |
+| `npm run lint`                                                        | ESLint 检查                                                            |
+| `npm run check:dist`                                                  | 检查构建产物中是否混入私钥/证书/测试密码                               |
+| `npm run verify:all`                                                  | 类型检查 + Lint + 测试 + 构建 + 产物检查（发布前一键）                 |
+| `node scripts/serve-dist.mjs 4174`                                    | 本地静态服务器跑构建产物（含 CSP 与 SPA 回退，等价于线上行为）         |
+| `npm run check:signing -- 证书.p12 [描述文件.mobileprovision] [密码]` | 本地自检签名材料：私钥是否存在、证书类型/有效期、与描述文件是否匹配    |
+| `npx wrangler dev`                                                    | 用**真实 Workers 运行时（workerd）**本地验证部署配置、深链回退与响应头 |
 
 ---
 
@@ -70,15 +71,16 @@ Vue 3 · TypeScript · Vite · Element Plus · Vue Router · IndexedDB（idb）�
 
 ## 文档
 
-| 文档 | 内容 |
-| --- | --- |
-| [docs/architecture.md](docs/architecture.md) | 架构与模块边界、数据流 |
-| [docs/data-model.md](docs/data-model.md) | 数据结构与 IndexedDB 表结构、备份格式 |
-| [docs/security.md](docs/security.md) | 安全设计、威胁模型、加密参数 |
-| [docs/known-limitations.md](docs/known-limitations.md) | 已知限制与未验证事项 |
-| [docs/deployment-cloudflare.md](docs/deployment-cloudflare.md) | Cloudflare Pages 部署与 GitHub 自动部署 |
-| [docs/acceptance-checklist.md](docs/acceptance-checklist.md) | 逐项验收清单（含需要你亲自验证的 Apple 侧项目） |
-| [docs/testing.md](docs/testing.md) | 测试说明与 OpenSSL 独立验证方法 |
+| 文档                                                                       | 内容                                             |
+| -------------------------------------------------------------------------- | ------------------------------------------------ |
+| [docs/architecture.md](docs/architecture.md)                               | 架构与模块边界、数据流                           |
+| [docs/data-model.md](docs/data-model.md)                                   | 数据结构与 IndexedDB 表结构、备份格式            |
+| [docs/security.md](docs/security.md)                                       | 安全设计、威胁模型、加密参数                     |
+| [docs/known-limitations.md](docs/known-limitations.md)                     | 已知限制与未验证事项                             |
+| [docs/deployment-cloudflare.md](docs/deployment-cloudflare.md)             | Cloudflare Pages 部署与 GitHub 自动部署          |
+| [docs/acceptance-checklist.md](docs/acceptance-checklist.md)               | 逐项验收清单（含需要你亲自验证的 Apple 侧项目）  |
+| [docs/troubleshooting-cloud-build.md](docs/troubleshooting-cloud-build.md) | HBuilderX / uni-app 云打包“证书导入失败”排查指引 |
+| [docs/testing.md](docs/testing.md)                                         | 测试说明与 OpenSSL 独立验证方法                  |
 
 ---
 

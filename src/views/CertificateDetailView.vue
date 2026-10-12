@@ -134,7 +134,7 @@
         <el-form-item label="密钥加密算法">
           <el-select v-model="exportDialog.algorithm" style="width: 100%">
             <el-option label="AES-256-CBC (PBES2，推荐)" value="aes256" />
-            <el-option label="3DES (兼容模式，旧工具链)" value="3des" />
+            <el-option label="3DES (兼容模式：旧工具链 / HBuilderX 等云打包)" value="3des" />
           </el-select>
         </el-form-item>
         <el-form-item label="导出密码" required>
