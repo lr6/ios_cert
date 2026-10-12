@@ -275,7 +275,9 @@ async function submitExport(): Promise<void> {
       friendlyName: detail.value?.record.name
     })
     downloadBytes(result.der, result.fileName, 'application/x-pkcs12')
-    ElMessage.success('P12 已生成并开始下载，请妥善保管密码')
+    ElMessage.success(
+      'P12 已生成并开始下载。请确认打包工具（HBuilderX 等）引用的是刚下载的这个文件：旧文件需覆盖，或重新浏览选择'
+    )
     exportDialog.visible = false
     await load()
   } catch (error) {
