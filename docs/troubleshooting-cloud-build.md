@@ -69,6 +69,27 @@ node scripts/check-signing-assets.mjs <你的证书.p12> <p12密码>
 
 ---
 
+## 2.1 实测对比：能用的旧 p12 与我们的 p12 差在哪（2026-10-12）
+
+现场一份**历史 p12（云打包平台可接受）**与本工具各配置档的对比：
+
+| 项目   | 历史 p12（平台接受）                       | modern（默认）            | legacy-3des      | **macos-keychain**    |
+| ------ | ------------------------------------------ | ------------------------- | ---------------- | --------------------- |
+| 私钥袋 | pbeWithSHAAnd3-KeyTripleDES-CBC, iter 2048 | PBES2+AES-256, iter 10000 | 3DES, iter 10000 | 3DES, **iter 2048**   |
+| 证书袋 | **pbeWithSHA1And40BitRC2-CBC**, iter 2048  | PBES2+AES-256             | 3DES             | **RC2-40, iter 2048** |
+| MAC    | sha1, **iter 1**                           | sha1, iter 10000          | sha1, iter 10000 | sha1, **iter 1**      |
+
+历史 p12 是典型的 **macOS 钥匙串导出格式**。为最大化兼容性，本工具新增 `macos-keychain`
+配置档（导出对话框里的「macOS 钥匙串格式」），逐字段复刻该格式：
+
+- 已用 `openssl asn1parse` 做结构比对：证书袋 `pbeWithSHA1And40BitRC2-CBC` + 迭代 2048、MAC 迭代 1，与历史文件一致；
+- 已用 **Java 8 的 `keytool -importkeystore`（强制解密私钥）** 验证可完整导入；
+- 本工具自身解析器也能读回并校验证书↔私钥匹配。
+
+> 注意：OpenSSL 3 读取 RC2-40 需要 legacy provider，部分 Git for Windows 自带的 OpenSSL 缺该模块
+> （报 `unable to load provider legacy`）。这只影响命令行查看，不影响文件本身；
+> Java / BouncyCastle / macOS 钥匙串均可正常处理。
+
 ## 3. 需要把 Apple WWDR 中间证书打进 p12 时
 
 本工具的导出接口支持附加中间证书（`chainPems`），但目前界面尚未暴露该选项。
@@ -85,6 +106,17 @@ openssl pkcs12 -export -out with-chain.p12 \
 ```
 
 （如果这类需求常见，我们可以把“附加中间证书”做成界面上的一个文件选择项。）
+
+**手工复刻“钥匙串格式”**（需要 OpenSSL 支持 legacy provider）：
+
+```bash
+openssl pkcs12 -legacy -export -out keychain-format.p12 \
+  -inkey key.pem -in leaf.pem -certfile AppleWWDRCAG3.pem \
+  -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-RC2-40 -macalg sha1 -maciter 1 -iter 2048 \
+  -name "cert-name" -passout pass:你的密码
+```
+
+更省事的做法：直接用本工具导出对话框里的「macOS 钥匙串格式」。
 
 ---
 

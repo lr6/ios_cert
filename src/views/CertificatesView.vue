@@ -166,11 +166,14 @@
         <el-form-item label="证书">
           <span class="mono">{{ exportDialog.name }}</span>
         </el-form-item>
-        <el-form-item label="密钥加密算法">
-          <el-select v-model="exportDialog.algorithm" style="width: 100%">
-            <el-option label="AES-256-CBC (PBES2，推荐)" value="aes256" />
-            <el-option label="3DES (兼容模式：旧工具链 / HBuilderX 等云打包)" value="3des" />
+        <el-form-item label="导出格式">
+          <el-select v-model="exportDialog.profile" style="width: 100%">
+            <el-option v-for="(label, value) in PKCS12_PROFILE_LABELS" :key="value" :label="label" :value="value" />
           </el-select>
+          <div class="hint">
+            云打包（HBuilderX / uni-app）遇到「证书导入失败」时，选「macOS 钥匙串格式」—— 它与 macOS
+            钥匙串导出的结构完全一致（RC2-40 证书袋 + MAC 迭代 1）。
+          </div>
         </el-form-item>
         <el-form-item label="导出密码" required>
           <el-input v-model="exportDialog.password" type="password" show-password placeholder="至少 8 位" />
@@ -214,7 +217,7 @@ import {
 import type { CertificateRecord } from '@/types/record'
 import { countByStatus, deleteCertificateCascade, listCertificates } from '@/services/storage/certificate-repository'
 import { exportP12, importCer, renameCertificate } from '@/services/certificates/certificate-service'
-import type { Pkcs12Algorithm } from '@/services/certificates/pkcs12-service'
+import { PKCS12_PROFILE_LABELS, type Pkcs12Profile } from '@/services/certificates/pkcs12-service'
 import { downloadBytes, downloadText, formatDate, formatDateTime, readFileBytes } from '@/utils/file-download'
 import { describeError } from '@/utils/errors'
 import {
@@ -244,7 +247,7 @@ const exportDialog = reactive({
   name: '',
   password: '',
   confirm: '',
-  algorithm: 'aes256' as Pkcs12Algorithm,
+  profile: 'macos-keychain' as Pkcs12Profile,
   loading: false
 })
 
@@ -381,7 +384,7 @@ function openExportDialog(record: CertificateRecord): void {
   exportDialog.name = record.name
   exportDialog.password = ''
   exportDialog.confirm = ''
-  exportDialog.algorithm = (record.p12Algorithm as Pkcs12Algorithm) ?? 'aes256'
+  exportDialog.profile = (record.p12Algorithm as Pkcs12Profile) ?? 'macos-keychain'
   exportDialog.visible = true
 }
 
@@ -401,7 +404,7 @@ async function submitExport(): Promise<void> {
   try {
     const result = await exportP12(exportDialog.id, {
       password: exportDialog.password,
-      algorithm: exportDialog.algorithm,
+      profile: exportDialog.profile,
       friendlyName: exportDialog.name
     })
     downloadBytes(result.der, result.fileName, 'application/x-pkcs12')

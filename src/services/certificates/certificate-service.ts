@@ -9,10 +9,11 @@ import type { CertificateRecord, KeyRecord } from '@/types/record'
 import { DEFAULT_RSA_BITS, createCsr, generateRsaKeyPair } from '@/services/certificates/csr-service'
 import { certificateMatchesPrivateKey, parseCertificate } from '@/services/certificates/x509-service'
 import {
+  PKCS12_PROFILE_OPTIONS,
   createPkcs12,
   parsePkcs12,
-  type Pkcs12Algorithm,
-  type Pkcs12ExportOptions
+  type Pkcs12ExportOptions,
+  type Pkcs12Profile
 } from '@/services/certificates/pkcs12-service'
 import { sealPrivateKey, unsealPrivateKey } from '@/services/crypto/key-management-service'
 import {
@@ -162,9 +163,9 @@ export async function importCer(
 export interface P12ExportRequest {
   password: string
   friendlyName?: string
-  algorithm?: Pkcs12Algorithm
-  iterations?: number
-  /** 是否把证书链一并打包（当前仅支持叶子证书 + 用户额外导入的中间证书，见后续版本） */
+  /** 导出配置档（默认 modern：AES-256） */
+  profile?: Pkcs12Profile
+  /** 是否把证书链一并打包（如 Apple WWDR 中间证书） */
   chainPems?: string[]
 }
 
@@ -197,11 +198,11 @@ export async function exportP12(certificateId: string, request: P12ExportRequest
     throw new Error(`证书与私钥不匹配，已中止导出：${match.reason}`)
   }
 
+  const profile: Pkcs12Profile = request.profile ?? 'modern'
   const options: Pkcs12ExportOptions = {
     password: request.password,
     friendlyName: request.friendlyName ?? record.name,
-    algorithm: request.algorithm ?? 'aes256',
-    iterations: request.iterations,
+    ...PKCS12_PROFILE_OPTIONS[profile],
     chainPems: request.chainPems
   }
   const der = createPkcs12(privateKeyPem, record.cerPem, options)
@@ -223,7 +224,7 @@ export async function exportP12(certificateId: string, request: P12ExportRequest
   const updated = await updateCertificate(certificateId, {
     status: 'ready',
     p12ExportedAt: new Date().toISOString(),
-    p12Algorithm: options.algorithm,
+    p12Algorithm: profile,
     p12FriendlyName: options.friendlyName,
     p12ChainLength: 1 + (request.chainPems?.length ?? 0),
     lastError: undefined

@@ -19,6 +19,37 @@ import { bytesToBase64, bytesToBinaryString, binaryStringToBytes } from '@/utils
 
 export type Pkcs12Algorithm = 'aes256' | 'aes192' | 'aes128' | '3des'
 
+/**
+ * 证书袋加密算法。
+ * - 'match'：与私钥袋保持一致（默认）
+ * - 'rc2-40'：pbeWithSHA1And40BitRC2-CBC，macOS 钥匙串 / Windows 传统导出用的算法
+ */
+export type CertificateBagAlgorithm = 'match' | 'rc2-40'
+
+/**
+ * 导出配置档（给普通用户选的三种组合）。
+ * - modern：AES-256 + AES 证书袋（默认，最现代）
+ * - legacy-3des：3DES + 3DES 证书袋（旧工具链）
+ * - macos-keychain：3DES + RC2-40 证书袋 + MAC 迭代 1，
+ *   与 macOS 钥匙串（以及本项目验证过"能被云打包平台接受"的历史文件）格式完全一致
+ */
+export type Pkcs12Profile = 'modern' | 'legacy-3des' | 'macos-keychain'
+
+export const PKCS12_PROFILE_OPTIONS: Record<
+  Pkcs12Profile,
+  Pick<Pkcs12ExportOptions, 'algorithm' | 'certificateBagAlgorithm' | 'iterations' | 'macIterations'>
+> = {
+  modern: { algorithm: 'aes256', certificateBagAlgorithm: 'match', iterations: 10000, macIterations: 10000 },
+  'legacy-3des': { algorithm: '3des', certificateBagAlgorithm: 'match', iterations: 10000, macIterations: 10000 },
+  'macos-keychain': { algorithm: '3des', certificateBagAlgorithm: 'rc2-40', iterations: 2048, macIterations: 1 }
+}
+
+export const PKCS12_PROFILE_LABELS: Record<Pkcs12Profile, string> = {
+  modern: '默认（AES-256，现代工具链）',
+  'legacy-3des': '3DES（旧工具链兼容）',
+  'macos-keychain': 'macOS 钥匙串格式（RC2-40，兼容性最好；云打包/HBuilderX 推荐）'
+}
+
 export interface Pkcs12ExportOptions {
   /** 导出密码；空字符串表示不加密（不推荐，仅用于测试场景） */
   password: string
@@ -34,6 +65,10 @@ export interface Pkcs12ExportOptions {
   chainPems?: string[]
   /** 是否加密证书袋，默认 true（与 OpenSSL/Apple 传统产物一致；设为 false 仅为排查兼容性问题） */
   encryptCertificateBags?: boolean
+  /** 证书袋加密算法，默认 'match'（与私钥袋一致） */
+  certificateBagAlgorithm?: CertificateBagAlgorithm
+  /** MAC 迭代次数，默认与 iterations 相同；macOS 钥匙串用的是 1 */
+  macIterations?: number
 }
 
 export interface Pkcs12Contents {
@@ -58,6 +93,9 @@ interface ForgeRuntime {
   }
   des: {
     createEncryptionCipher(key: string): ForgeCipher
+  }
+  rc2: {
+    createEncryptionCipher(key: string, bits: number): ForgeCipher
   }
   aes: {
     createEncryptionCipher(key: string): ForgeCipher
@@ -115,7 +153,9 @@ export function createPkcs12(privateKeyPem: string, certificatePem: string, opti
   if ((options.encryptCertificateBags ?? true) && (options.password ?? '').length > 0) {
     encryptCertificateSafeContents(asn1, options.password ?? '', {
       algorithm: options.algorithm ?? 'aes256',
+      certificateBagAlgorithm: options.certificateBagAlgorithm ?? 'match',
       iterations: options.iterations ?? DEFAULT_ITERATIONS,
+      macIterations: options.macIterations ?? options.iterations ?? DEFAULT_ITERATIONS,
       saltSize: 8
     })
   }
@@ -188,8 +228,14 @@ export function pkcs12ToBase64(der: Uint8Array): string {
 }
 
 interface SafeContentsEncryptionOptions {
+  /** 私钥袋算法（同时决定证书袋在 'match' 模式下的算法） */
   algorithm: Pkcs12Algorithm
+  /** 证书袋算法 */
+  certificateBagAlgorithm: CertificateBagAlgorithm
+  /** PBE 迭代次数 */
   iterations: number
+  /** MAC 迭代次数 */
+  macIterations: number
   /** PKCS#12 PBE 的盐长度（OpenSSL 传统产物为 8 字节） */
   saltSize: number
 }
@@ -211,7 +257,25 @@ function encryptSafeContents(
   let encryptionAlgorithm: forge.asn1.Asn1
   let encrypted: string
 
-  if (options.algorithm === '3des') {
+  const certBagAlgorithm =
+    options.certificateBagAlgorithm === 'match' ? options.algorithm : options.certificateBagAlgorithm
+
+  if (certBagAlgorithm === 'rc2-40') {
+    // pbeWithSHA1And40BitRC2-CBC：macOS 钥匙串 / Windows 传统导出使用的证书袋算法
+    const saltBuffer = forgeRuntime.util.createBuffer(salt)
+    const key = forgeRuntime.pki.pbe.generatePkcs12Key(password, saltBuffer, 1, count, 5)
+    const iv = forgeRuntime.pki.pbe.generatePkcs12Key(password, saltBuffer, 2, count, 8)
+    const cipher = forgeRuntime.rc2.createEncryptionCipher(key, 40)
+    cipher.start(iv)
+    cipher.update(forge.util.createBuffer(safeContentsDer))
+    cipher.finish()
+    encrypted = cipher.output.getBytes()
+
+    encryptionAlgorithm = sequence([
+      oid(forge.pki.oids['pbewithSHAAnd40BitRC2-CBC']),
+      sequence([octetString(salt), integer(countBytes.getBytes())])
+    ])
+  } else if (certBagAlgorithm === '3des') {
     const saltBuffer = forgeRuntime.util.createBuffer(salt)
     const key = forgeRuntime.pki.pbe.generatePkcs12Key(password, saltBuffer, 1, count, 24)
     const iv = forgeRuntime.pki.pbe.generatePkcs12Key(password, saltBuffer, 2, count, 24)
@@ -226,8 +290,8 @@ function encryptSafeContents(
       sequence([octetString(salt), integer(countBytes.getBytes())])
     ])
   } else {
-    const keyLength = options.algorithm === 'aes128' ? 16 : options.algorithm === 'aes192' ? 24 : 32
-    const cipherOid = forge.pki.oids[`${options.algorithm}-CBC`]
+    const keyLength = certBagAlgorithm === 'aes128' ? 16 : certBagAlgorithm === 'aes192' ? 24 : 32
+    const cipherOid = forge.pki.oids[`${certBagAlgorithm}-CBC`]
     const digest = forge.md.sha1.create()
     const key = forge.pkcs5.pbkdf2(password, salt, count, keyLength, digest)
     const iv = forge.random.getBytesSync(16)
@@ -291,7 +355,7 @@ function encryptCertificateSafeContents(
   if (!macData) return
 
   const macSalt = forge.random.getBytesSync(options.saltSize)
-  const macKey = forge.pkcs12.generateKey(password, forge.util.createBuffer(macSalt), 3, options.iterations, 20)
+  const macKey = forge.pkcs12.generateKey(password, forge.util.createBuffer(macSalt), 3, options.macIterations, 20)
   const mac = forge.hmac.create()
   mac.start(forge.md.sha1.create(), macKey)
   mac.update(authenticatedSafeDer)
@@ -302,7 +366,8 @@ function encryptCertificateSafeContents(
   // macChildren[0] = DigestInfo ::= SEQUENCE { digestAlgorithm, digest OCTET STRING }
   asn1SetString(asn1Child(macChildren[0], 1), macValue.getBytes())
   asn1SetString(macChildren[1], macSalt)
-  asn1SetString(macChildren[2], asn1.integerToDer(options.iterations).getBytes())
+  // PKCS#12 中 MacData.iterations 的默认值就是 1，为 1 时不写该字段（macOS 钥匙串即如此）
+  asn1SetString(macChildren[2], asn1.integerToDer(options.macIterations).getBytes())
 }
 
 function sequence(children: forge.asn1.Asn1[]): forge.asn1.Asn1 {

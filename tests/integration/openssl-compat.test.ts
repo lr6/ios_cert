@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createCsr, generateRsaKeyPair, publicKeyPemFromCsr } from '@/services/certificates/csr-service'
-import { createPkcs12, parsePkcs12 } from '@/services/certificates/pkcs12-service'
+import { PKCS12_PROFILE_OPTIONS, createPkcs12, parsePkcs12 } from '@/services/certificates/pkcs12-service'
 import { certificateMatchesPrivateKey, parseCertificatePem } from '@/services/certificates/x509-service'
 import { opensslVersion, resolveOpenSsl, runOpenSsl } from '../helpers/openssl'
 
@@ -261,6 +261,41 @@ describe.skipIf(!openssl)('OpenSSL 独立兼容性验证（集成）', () => {
     expect(contents.friendlyName).toBe(friendlyName)
   })
 
+  it('macOS 钥匙串兼容格式：RC2-40 证书袋 + 3DES 私钥袋 + MAC 迭代 1（云打包平台已知可用格式）', () => {
+    const parsed = parseCertificatePem(readFileSync(certPath, 'utf8'))
+    const der = createPkcs12(privateKeyPem, parsed.pem, {
+      password: PASSWORD,
+      ...PKCS12_PROFILE_OPTIONS['macos-keychain'],
+      friendlyName: 'Keychain Compat'
+    })
+
+    // 证书袋必须是 pbeWithSHA1And40BitRC2-CBC（1.2.840.113549.1.12.1.6）
+    expect(derContainsOid(der, OID_PBE_SHA1_RC2_40), '未找到 RC2-40 证书袋').toBe(true)
+    // 私钥袋与证书袋都用传统 PBE
+    expect(countOidOccurrences(der, OID_PBE_SHA1_3DES)).toBeGreaterThanOrEqual(1)
+    // MAC 迭代次数为 1（PKCS#12 默认值，macOS 钥匙串即如此）
+    // MAC 迭代次数为 1（MacData 的 iterations 是最后一个字段，DEFAULT 1）
+    // 对照：modern 配置档写的是 0x2710 = 10000
+    expect(Array.from(der.slice(-3))).toEqual([0x02, 0x01, 0x01])
+
+    // OpenSSL 3 读取 RC2-40 需要 legacy provider；本机 Git 自带版本可能加载不了该模块，
+    // 此时明确记录并跳过（Java 8 与 BouncyCastle 的验证结果见 docs/troubleshooting-cloud-build.md）
+    const written = join(dir, 'out-keychain.p12')
+    writeFileSync(written, der)
+    const info = runOpenSsl(openssl!, ['pkcs12', '-in', written, '-passin', `pass:${PASSWORD}`, '-info', '-nokeys'])
+    const legacyUnavailable = /unable to load provider legacy|unsupported/i.test(info.stdout + info.stderr)
+    if (legacyUnavailable) {
+      console.warn('[verify-crypto] 本机 OpenSSL 缺少 legacy provider，跳过 RC2-40 的 OpenSSL 读取断言')
+    } else {
+      expect(info.ok, `OpenSSL 无法读取钥匙串格式产物: ${info.stderr}`).toBe(true)
+    }
+
+    // 我们自己也要能读回，且证书与私钥匹配
+    const contents = parsePkcs12(der, PASSWORD)
+    expect(certificateMatchesPrivateKey(contents.certificatePems[0], contents.privateKeyPem).matches).toBe(true)
+    expect(contents.friendlyName).toBe('Keychain Compat')
+  })
+
   it('能读取 OpenSSL 导出的传统 P12 与 OpenSSL 3 默认参数的现代 P12（反向互通）', () => {
     const legacyP12 = join(dir, 'openssl-legacy.p12')
     const legacyExport = runOpenSsl(openssl!, [
@@ -316,6 +351,7 @@ const OID_PBES2 = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x05, 0x0d] // 1.2.
 const OID_AES256_CBC = [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x01, 0x2a] // 2.16.840.1.101.3.4.1.42
 const OID_PBE_SHA1_3DES = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01, 0x03] // 1.2.840.113549.1.12.1.3
 const OID_ENCRYPTED_DATA = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x06] // 1.2.840.113549.1.7.6
+const OID_PBE_SHA1_RC2_40 = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01, 0x06] // 1.2.840.113549.1.12.1.6
 
 function derContainsOid(der: Uint8Array, oid: number[]): boolean {
   outer: for (let i = 0; i + oid.length <= der.length; i++) {
