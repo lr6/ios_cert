@@ -29,6 +29,9 @@ tmp-*
 .env.*
 !.env.example
 
+# 用户放签名材料的目录（含真实私钥，绝对不能提交）
+/cert/
+
 # === 密钥与证书：一律不要提交 ===
 # 测试夹具改为运行时生成，仓库里不需要任何密钥或证书文件，
 # 见 tests/fixtures/README.md 与 tests/helpers/fixture.ts
