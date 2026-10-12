@@ -1,0 +1,99 @@
+/* 传统中文后台管理风格：浅灰底、白色卡片、蓝色主操作色 */
+:root {
+  --page-bg: #f0f2f5;
+  --card-bg: #ffffff;
+  --primary: #1677ff;
+  --text-main: #303133;
+  --text-sub: #606266;
+  --border: #ebeef5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--page-bg);
+  color: var(--text-main);
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  font-size: 14px;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.page {
+  padding: 16px;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 4px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.card + .card {
+  margin-top: 16px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  padding-left: 8px;
+  border-left: 3px solid var(--primary);
+  line-height: 1.2;
+}
+
+.hint {
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.mono {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  word-break: break-all;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.toolbar .spacer {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 8px;
+  }
+  .card {
+    padding: 12px;
+  }
+}
+
+/* Element Plus 在部分容器布局下不会自动为表格开启横向滚动，
+   会导致固定列与内容重叠。这里兜底保证列多时横向滚动，而不是把列压扁。 */
+.el-table__body-wrapper {
+  overflow-x: auto;
+}
+
+.el-table__header-wrapper {
+  overflow-x: hidden;
+}

@@ -1,0 +1,41 @@
+# === 依赖与构建产物 ===
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# === 编辑器 / 工具产生的历史与调试产物（不要提交）===
+.history/
+.playwright-mcp/
+.vscode/
+.idea/
+*.swp
+
+# === 操作系统文件 ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === 日志与临时文件 ===
+*.log
+tmp-*
+*.tmp
+*.bak
+
+# === 环境变量 ===
+# 本项目不需要任何环境变量（不在这里放密钥 / 密码 / 证书）
+.env
+.env.*
+!.env.example
+
+# === 密钥与证书：一律不要提交 ===
+# 测试夹具改为运行时生成，仓库里不需要任何密钥或证书文件，
+# 见 tests/fixtures/README.md 与 tests/helpers/fixture.ts
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.der
+*.mobileprovision
+*.certSigningRequest
