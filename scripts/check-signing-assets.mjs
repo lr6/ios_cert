@@ -44,6 +44,7 @@ line('')
 line(`[1] 证书文件: ${basename(p12Path)}`)
 
 let p12 = null
+let appleIssued = false
 try {
   const bytes = readFileSync(p12Path)
   p12 = parseP12(bytes, password)
@@ -72,6 +73,16 @@ if (p12) {
 
     const kind = classifyCertificate(leaf.subject)
     line(`    证书类型: ${kind.label}`)
+    if (p12.aliases.length > 0) line(`    别名(friendlyName): ${p12.aliases.join(' / ')}`)
+    if (/\.os\.apple\.com|Apple Worldwide Developer Relations|Apple Inc\./i.test(leaf.issuer)) {
+      line('    签发者: ✓ Apple（证书由 Apple 签发）')
+      appleIssued = true
+    } else {
+      problems.push(
+        '证书不是 Apple 签发的（Issuer 不含 Apple）—— 请确认导入的是 Apple Developer 后台下载的 .cer，而不是自签/其它来源的证书'
+      )
+      line(`    签发者: ✗ 看起来不是 Apple 签发（${leaf.issuer}）`)
+    }
     if (kind.isDevelopment) {
       notes.push('这是“开发证书”。若你要打发布包（App Store / 企业分发），必须换成 Apple Distribution 或企业证书')
     }
@@ -156,7 +167,9 @@ if (profilePath) {
 line('')
 line('='.repeat(72))
 if (problems.length === 0) {
-  line('结论：没有发现明显问题。若云打包仍报“证书导入失败”，请优先检查：')
+  line(
+    `结论：文件层面可用（Apple 签发=${appleIssued ? '是' : '未确认'}${profilePath ? '，证书与描述文件匹配' : ''}）。若云打包仍报“证书导入失败”，请优先检查：`
+  )
   line('  1) 在云打包界面填写的 p12 密码是否与导出时完全一致（注意全角/半角、首尾空格）')
   line('  2) 上传的 p12 是否就是刚才检查的这一个文件（避免选错文件）')
   line('  3) 打包类型（开发/发布）与证书类型是否一致')
@@ -208,10 +221,15 @@ function parseP12(bytes, pass) {
     }))
 
   const key = keyBag?.key
+  const aliases = [...shrouded, ...plain]
+    .flatMap((bag) => [...(bag.attributes?.friendlyName ?? []), ...(bag.attributes?.localKeyId ?? []).map(() => null)])
+    .filter(Boolean)
+
   return {
     privateKey: key ?? null,
     privateKeyBits: key?.n ? key.n.bitLength() : 0,
     privateKeyType: key?.n ? 'RSA' : 'EC',
+    aliases,
     certificates
   }
 }
